@@ -5,8 +5,11 @@
 #                       Defaults to SQL Server ODBC driver, use DSN to support
 #                       alternative DBMS.
 #
-#						Fails by throwing exception so that we get full internal
-#						error details. Will change to try/except when mature.
+#                       Fails by throwing exception so that we get full internal
+#                       error details. Will change to try/except when mature.
+#
+#                       WARNING: Does not yet support all SQL Server data types,
+#                                updates in progress.
 #
 #                       Setup:
 #                       ------
