@@ -91,7 +91,7 @@ import time
 # Banner
 
 print ()
-print ('odbc2parquet: Export table/query to parquet.')
+print ('odbc2parquet: Export table/query to Parquet.')
 
 timeStart = time.time()
 
@@ -126,6 +126,7 @@ elif outputFileName is None and tableName is None:
     outputFileName = 'query.parquet'
 
 if args.query is None and args.table is None:
+	
     print ('Please specify TABLE (-t) or QUERY (-q)')
     exit (1)
     
