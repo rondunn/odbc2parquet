@@ -88,6 +88,11 @@ import decimal
 import datetime
 import time
 
+# PyODBC data type handler
+
+def handle_unknown_data_type (value):
+	return str(value)
+
 # Banner
 
 print ()
@@ -148,6 +153,10 @@ else:
                              DATABASE={args.database};
                              UID={args.user};
                              PWD={args.password}""",readonly=True) 
+
+# Add handlers for unsupported data types
+
+con.add_output_converter(-151, handle_unknown_data_type)
             
 # Execute query
            
@@ -158,6 +167,7 @@ cur.execute (query)
 
 fields = []
 for c in cur.description:
+    print (c)
     ct = c[1]
     if ct is int:
         fields.append (pa.field (c[0],pa.int64(),nullable=c[6]))
