@@ -93,7 +93,7 @@ import time
 # PyODBC data type handler
 
 def handle_unknown_data_type (value):
-	return str(value)
+    return str(value)
 
 # Banner
 
@@ -134,7 +134,6 @@ elif outputFileName is None and tableName is None:
     outputFileName = 'query.parquet'
 
 if args.query is None and args.table is None:
-	
     print ('Please specify TABLE (-t) or QUERY (-q)')
     exit (1)
     
@@ -147,7 +146,7 @@ if args.table is not None:
 con = None
 if dsn:
     constr = 'DSN=' + dsn
-    if (user is not None and password is not None):
+    if user is not None and password is not None:
         constr = constr + f";UID={user};PWD={password}"
     con = pyodbc.connect(constr,readonly=True)
 else:
@@ -177,21 +176,21 @@ for c in cur.description:
     pr = c[4]
     sc = c[5]
     if ct is int:
-    	if pr == 3:
-        	fields.append (pa.field (c[0],pa.int8(),nullable=c[6]))
-    	elif pr == 5:
-        	fields.append (pa.field (c[0],pa.int16(),nullable=c[6]))
-    	elif pr == 10:
-        	fields.append (pa.field (c[0],pa.int32(),nullable=c[6]))
-    	else:
-        	fields.append (pa.field (c[0],pa.int64(),nullable=c[6]))
+        if pr == 3:
+            fields.append (pa.field (c[0],pa.int8(),nullable=c[6]))
+        elif pr == 5:
+            fields.append (pa.field (c[0],pa.int16(),nullable=c[6]))
+        elif pr == 10:
+            fields.append (pa.field (c[0],pa.int32(),nullable=c[6]))
+        else:
+            fields.append (pa.field (c[0],pa.int64(),nullable=c[6]))
     elif ct is decimal.Decimal:
         fields.append (pa.field (c[0],pa.decimal128(c[4],c[5]),nullable=c[6]))
     elif ct is float:
-    	if pr == 53:
-    		fields.append (pa.field (c[0],pa.float32(),nullable=[c[6]]))
-    	else:
-    		fields.append (pa.field (c[0],pa.float64(),nullable=[c[6]]))
+        if pr == 53:
+            fields.append (pa.field (c[0],pa.float32(),nullable=[c[6]]))
+        else:
+            fields.append (pa.field (c[0],pa.float64(),nullable=[c[6]]))
     elif ct is str:
         fields.append (pa.field (c[0],pa.string(),nullable=c[6]))
     elif ct is bytearray:
@@ -212,7 +211,7 @@ schema = pa.schema (fields)
 rowcount = 0
 writer = None
 cols = None
-while (True):
+while True:
     
     # Fetch enough rows to fill a rowgroup
     
