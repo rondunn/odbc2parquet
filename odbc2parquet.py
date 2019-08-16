@@ -41,6 +41,8 @@
 #                       -q    --query         SQL query to export
 #                                             Must have aliased column names
 #
+#                             --debug         Print debug information
+#
 #                       Output:
 #                       -------
 #                       Output file name and number of rows exported to parquet
@@ -112,6 +114,7 @@ parser.add_argument ('-o','--output')
 parser.add_argument ('-r','--rowgroup',type=int,default=1000000)
 parser.add_argument ('-t','--table')
 parser.add_argument ('-q','--query')
+parser.add_argument ('--debug',action='store_true')
 args = parser.parse_args()
 
 # Validate arguments.
@@ -167,12 +170,27 @@ cur.execute (query)
 
 fields = []
 for c in cur.description:
-    print (c)
+    if args.debug is True:
+        print (c)
     ct = c[1]
+    pr = c[4]
+    sc = c[5]
     if ct is int:
-        fields.append (pa.field (c[0],pa.int64(),nullable=c[6]))
+    	if pr == 3:
+        	fields.append (pa.field (c[0],pa.int8(),nullable=c[6]))
+    	elif pr == 5:
+        	fields.append (pa.field (c[0],pa.int16(),nullable=c[6]))
+    	elif pr == 10:
+        	fields.append (pa.field (c[0],pa.int32(),nullable=c[6]))
+    	else:
+        	fields.append (pa.field (c[0],pa.int64(),nullable=c[6]))
     elif ct is decimal.Decimal:
         fields.append (pa.field (c[0],pa.decimal128(c[4],c[5]),nullable=c[6]))
+    elif ct is float:
+    	if pr == 53:
+    		fields.append (pa.field (c[0],pa.float32(),nullable=[c[6]]))
+    	else:
+    		fields.append (pa.field (c[0],pa.float64(),nullable=[c[6]]))
     elif ct is str:
         fields.append (pa.field (c[0],pa.string(),nullable=c[6]))
     elif ct is bytearray:
@@ -232,5 +250,15 @@ timeNow = time.time()
 elapsed = timeNow - timeStart
 rps = int(rowcount / elapsed)
 print (f"{rowcount} rows exported to {outputFileName} at {rps} rows per second.")
+
+if args.debug is True:
+    print ()
+    print ('Test output display:')
+    print ()
+    print ('Schema:')
+    print (pq.read_schema(outputFileName))
+    print ()
+    testTable = pq.read_table (outputFileName)
+    print (testTable.to_pandas())
 
 exit(0)
