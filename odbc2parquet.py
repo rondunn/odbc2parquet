@@ -160,6 +160,7 @@ else:
 # Add handlers for unsupported data types
 
 con.add_output_converter(-151, handle_unknown_data_type)
+con.add_output_converter(-155, handle_unknown_data_type)
             
 # Execute query
            
@@ -195,6 +196,10 @@ for c in cur.description:
         fields.append (pa.field (c[0],pa.string(),nullable=c[6]))
     elif ct is bytearray:
         fields.append (pa.field (c[0],pa.binary(),nullable=c[6]))
+    elif ct is datetime.date:
+        fields.append (pa.field (c[0],pa.date32(),nullable=c[6]))
+    elif ct is datetime.time:
+        fields.append (pa.field (c[0],pa.time32('ms'),nullable=c[6]))
     elif ct is datetime.datetime:
         fields.append (pa.field (c[0],pa.timestamp('ms'),nullable=c[6]))
     elif ct is bool:
@@ -259,6 +264,7 @@ if args.debug is True:
     print (pq.read_schema(outputFileName))
     print ()
     testTable = pq.read_table (outputFileName)
-    print (testTable.to_pandas())
+    print ('Data (10 rows):')
+    print (testTable.to_pandas().head(10))
 
 exit(0)
