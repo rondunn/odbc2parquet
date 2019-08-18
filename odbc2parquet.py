@@ -21,7 +21,7 @@
 #
 #                       Execution:
 #                       ----------
-#                       python odbc2parquet <options>
+#                       python odbc2parquet.py <options>
 #
 #                       -D    --DSN           ODBC DSN
 #                       -s    --server        Server (if not defined by DSN)
@@ -156,10 +156,12 @@ else:
                              UID={args.user};
                              PWD={args.password}""",readonly=True) 
 
-# Add handlers for unsupported data types
+# Add handlers for unsupported data types. Current strategy
+# is to simply pass strings of binary values, may get more
+# intelligent in future updates.
 
-con.add_output_converter(-151, handle_unknown_data_type)
-con.add_output_converter(-155, handle_unknown_data_type)
+con.add_output_converter(-151, handle_unknown_data_type) # Geography
+con.add_output_converter(-155, handle_unknown_data_type) # DateTimeInterval
             
 # Execute query
            
@@ -209,16 +211,25 @@ schema = pa.schema (fields)
 # Process result set
 
 rowcount = 0
+totalReadTime = 0
+totalTransformTime = 0
+totalWriteTime = 0
 writer = None
 cols = None
 while True:
     
     # Fetch enough rows to fill a rowgroup
-    
+
+    startRead = time.time()
     res = cur.fetchmany(rowgroupSize)
     if not res:
         break
-        
+
+    if args.debug is True:
+        totalReadTime = totalReadTime + (time.time() - startRead)
+
+    # Write progress stats for each rowgroup
+
     if rowcount > 0:
         timeNow = time.time()
         elapsed = timeNow - timeStart
@@ -226,7 +237,8 @@ while True:
         print (f"{rowcount} rows at {rps} rows per second.")
         
     # Convert rows to dataframe
-    
+
+    startTransform = time.time()
     rows = []
     if cols is None:
         cols = [column[0] for column in cur.description]
@@ -238,12 +250,19 @@ while True:
     # Convert dataframe to Table
     
     table = pa.Table.from_pandas(df,schema)
-    
-    # Write table to Parquet
-    
+
+    if args.debug is True:
+        totalTransformTime = totalTransformTime + (time.time() - startTransform)
+
+    # Append table as Parquet rowgroup
+
+    startWrite = time.time()
     if writer is None:
         writer = pq.ParquetWriter(outputFileName,schema) # ,coerce_timestamps='ms'
     writer.write_table (table)
+
+    if args.debug is True:
+        totalWriteTime = totalWriteTime + (time.time() - startWrite)
 
 if writer:
     writer.close()
@@ -256,6 +275,9 @@ rps = int(rowcount / elapsed)
 print (f"{rowcount} rows exported to {outputFileName} at {rps} rows per second.")
 
 if args.debug is True:
+    print ()
+    print ('Performance breakdown:')
+    print (f'Read={totalReadTime:.2f} Transform={totalTransformTime:.2f} Write={totalWriteTime:.2f}')
     print ()
     print ('Test output display:')
     print ()
