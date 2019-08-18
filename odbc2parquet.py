@@ -36,6 +36,10 @@
 #                       -r    --rowgroup      Rowgroup Size
 #                                             Defaults to 1,000,000
 #
+#                       -b    --blocksize     File block size in megabytes
+#                                             Defaults to 0, in which case a single
+#                                             file is written.
+#
 #                       -t    --table         [Schema.]Table to export
 #
 #                       -q    --query         SQL query to export
@@ -72,7 +76,7 @@
 #                                           -u myUserName \
 #                                           -p myPassword \
 #                                           -t SalesLT.SalesOrderHeader \
-#                                           -o test.parquet \
+#                                           -o test \
 #                                           -r 1024
 #
 #                       Custom query, results to default 'query.parquet':
@@ -112,6 +116,7 @@ parser.add_argument ('-u','--user')
 parser.add_argument ('-p','--password')
 parser.add_argument ('-o','--output')
 parser.add_argument ('-r','--rowgroup',type=int,default=1000000)
+parser.add_argument ('-b','--blocksize',type=int,default=0)
 parser.add_argument ('-t','--table')
 parser.add_argument ('-q','--query')
 parser.add_argument ('--debug',action='store_true')
@@ -125,13 +130,22 @@ database = args.database
 user = args.user
 password = args.password
 rowgroupSize = args.rowgroup
+blockSize = args.blocksize
 tableName = args.table
 
-outputFileName = args.output
-if outputFileName is None and tableName is not None:
-    outputFileName = tableName.replace('.','_').lower() + '.parquet'
-elif outputFileName is None and tableName is None:
-    outputFileName = 'query.parquet'
+fileNumber = 1
+outputFileRoot = args.output
+
+if outputFileRoot is None and tableName is not None:
+    outputFileRoot = tableName.replace('.','_').lower()
+elif outputFileRoot is None and tableName is None:
+    outputFileRoot = 'query'
+
+if blockSize > 0:
+    outputFileName = f'{outputFileRoot}_{fileNumber:05d}.parquet'
+    fileNumber = fileNumber + 1
+else:
+    outputFileName = outputFileRoot + '.parquet'
 
 if args.query is None and args.table is None:
     print ('Please specify TABLE (-t) or QUERY (-q)')
@@ -166,6 +180,7 @@ con.add_output_converter(-155, handle_unknown_data_type) # DateTimeInterval
 # Execute query
            
 cur = con.cursor()
+cur.arraysize = rowgroupSize
 cur.execute (query)
 
 # Derive PyArrow schema from query result set
@@ -221,6 +236,7 @@ while True:
     # Fetch enough rows to fill a rowgroup
 
     startRead = time.time()
+
     res = cur.fetchmany(rowgroupSize)
     if not res:
         break
@@ -234,16 +250,19 @@ while True:
         timeNow = time.time()
         elapsed = timeNow - timeStart
         rps = int(rowcount / elapsed)
-        print (f"{rowcount} rows at {rps} rows per second.")
+        print (f"{rowcount} rows to {outputFileName} at {rps} rows per second.")
         
     # Convert rows to dataframe
 
     startTransform = time.time()
+
     rows = []
     if cols is None:
         cols = [column[0] for column in cur.description]
+
     for r in res:
         rows.append(dict(zip(cols,r)))
+
     rowcount = rowcount + len(rows)
     df = pandas.DataFrame(rows)
     
@@ -257,9 +276,21 @@ while True:
     # Append table as Parquet rowgroup
 
     startWrite = time.time()
+
     if writer is None:
         writer = pq.ParquetWriter(outputFileName,schema) # ,coerce_timestamps='ms'
+
     writer.write_table (table)
+
+    # Start new file if block size is specified and exceeded
+
+    if blockSize > 0:
+        fileSize = writer.file_handle.tell() / (1024*1024)
+        if fileSize > blockSize:
+            writer.close()
+            outputFileName = outputFileRoot + f'_{fileNumber:05d}.parquet'
+            fileNumber = fileNumber + 1
+            writer = pq.ParquetWriter(outputFileName,schema) # ,coerce_timestamps='ms'
 
     if args.debug is True:
         totalWriteTime = totalWriteTime + (time.time() - startWrite)
